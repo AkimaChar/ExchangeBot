@@ -1,6 +1,6 @@
 {
   "name": "changebot",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "type": "module",
   "description": "",
   "main": "index.js",
@@ -15,6 +15,8 @@
     "axios": "^0.26.1",
     "dotenv": "^16.0.0",
     "node-telegram-bot-api": "^0.56.0",
-    "nodemon": "^2.0.15"
+    "nodemon": "^2.0.15",
+    "pg": "^8.7.3",
+    "sequelize": "^6.17.0"
   }
 }
