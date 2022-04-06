@@ -17,6 +17,6 @@
     "node-telegram-bot-api": "^0.56.0",
     "nodemon": "^2.0.15",
     "pg": "^8.7.3",
-    "sequelize": "^6.17.0"
+    "sequelize": "^6.18.0"
   }
 }
