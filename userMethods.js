@@ -1,7 +1,7 @@
 import axios from "axios";
 import UserModel from "./User_Model.js";
 
-export function userMenu(bot, userid, username, menuStates) {
+export function menu(bot, userid, username) {
 	bot.sendMessage(userid, "Меню клиента, выберите действие", {
 		reply_markup: {
 			inline_keyboard: [
@@ -22,13 +22,12 @@ export function userMenu(bot, userid, username, menuStates) {
 					},
 					{
 						text: "Получить консультацию",
-						callback_data: "/getconsult",
+						callback_data: "/requestconsult",
 					},
 				],
 			],
 		},
 	});
-	console;
 	UserOrder.username = username;
 }
 
@@ -37,6 +36,8 @@ const UserOrder = {
 	type: 0,
 	currency: 0,
 	amount: 0,
+	status: 0,
+	manager: 0,
 };
 
 export function setAmountToExchange(bot, prev_msg, menuStates, data) {
@@ -84,6 +85,7 @@ export function setAmountToExchange(bot, prev_msg, menuStates, data) {
 	});
 	UserOrder.currency = data.slice(1);
 }
+
 export function chooseCryptoToBuy(bot, prev_msg, menuStates) {
 	menuStates.push(prev_msg);
 	bot.editMessageText("Выберите действие", {
@@ -114,12 +116,12 @@ export function chooseCryptoToBuy(bot, prev_msg, menuStates) {
 			],
 		},
 	});
-	UserOrder.type = "buy";
+	UserOrder.type = "покупка";
 }
 
 export function chooseCryptoToSell(bot, prev_msg, menuStates) {
 	menuStates.push(prev_msg);
-	UserOrder.type = "sell";
+	UserOrder.type = "продажа";
 	bot.editMessageText("Выберите действие", {
 		chat_id: prev_msg.chat.id,
 		message_id: prev_msg.message_id,
@@ -152,14 +154,15 @@ export function chooseCryptoToSell(bot, prev_msg, menuStates) {
 export async function sendConsultRequest(bot, prev_msg, menuStates) {
 	const newUser = await UserModel.create({
 		username: UserOrder.username,
-		type: UserOrder.type,
-		currency: UserOrder.currency,
-		amount: UserOrder.amount,
+		type: UserOrder.type ? UserOrder.type : "консультация",
+		currency: UserOrder.currency ? UserOrder.currency : "null",
+		amount: UserOrder.amount ? UserOrder.amount : 0,
+		status: "new",
+	}).then(() => {
+		sendNotification(bot);
 	});
 
-	console.log(await UserModel.findAll({ raw: true }));
-
-	//TODO: Add manager notification functionality (request text, sender id, time)
+	// console.log(await UserModel.findAll({ raw: true }));
 	menuStates.push(prev_msg);
 	bot.editMessageText("Менеджер скоро свяжется с вами 😉", {
 		chat_id: prev_msg.chat.id,
@@ -178,8 +181,32 @@ export async function sendConsultRequest(bot, prev_msg, menuStates) {
 	});
 }
 
+export async function sendNotification(bot) {
+	const rqcount = Object.values(await UserModel.findAll({ where: { status: "new" } }));
+	bot.getChatAdministrators(process.env.DEV_CHANNEL_ID).then((el) => {
+		if (el.custom_title === "Manager") bot.sendMessage(el.id, "Новая заявка на консультацию!");
+		bot.sendMessage(
+			process.env.DEVELOPER,
+			rqcount.length !== 0
+				? `${rqcount.length} необработанных заявок на консультацию`
+				: "Новых заявок нет!"
+		).then((response) => {
+			updateNotification(bot, response);
+		});
+	});
+}
+
+export async function updateNotification(bot, notification) {
+	setInterval(async () => {
+		const rqcount = Object.values(await UserModel.findAll({ where: { status: "new" } }));
+		bot.editMessageText(`${rqcount.length} необработанных заявок на консультацию`, {
+			chat_id: notification.chat.id,
+			message_id: notification.message_id,
+		}).catch((e) => {});
+	}, 1000);
+}
+
 export function orderExchange(bot, prev_msg, menuStates) {
-	console.log(menuStates);
 	menuStates.push(prev_msg);
 	bot.editMessageText("Выберите действие", {
 		chat_id: prev_msg.chat.id,

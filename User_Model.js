@@ -30,8 +30,16 @@ User.init(
 			allowNull: null,
 		},
 		amount: {
-			type: DataTypes.INTEGER,
+			type: DataTypes.DOUBLE,
 			allowNull: null,
+		},
+		status: {
+			type: DataTypes.STRING,
+			allowNull: null,
+		},
+		manager: {
+			type: DataTypes.STRING,
+			allowNull: true,
 		},
 	},
 	{
@@ -41,6 +49,6 @@ User.init(
 	}
 );
 // sequelize.sync({ force: true });
-await User.sync({ alter: true });
+// await User.sync({ alter: true });
 
 export default User;

@@ -1,4 +1,5 @@
 import TelegramBot from "node-telegram-bot-api";
+import UserModel from "./User_Model.js";
 import * as Admin from "./adminMethods.js";
 import * as User from "./userMethods.js";
 import dotenv from "dotenv";
@@ -7,24 +8,32 @@ dotenv.config();
 
 const token = process.env.DEV_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
-
 const menuStates = [];
 
-bot.on("message", (msg) => {
-	switch (msg.text) {
-		case "/start":
-			showBotMenu(bot, msg.from.id, msg.from.username, menuStates);
-			break;
+bot.onText(/\/start/, (msg, match) => {
+	if (msg.chat.id > 0 && msg.text === "/start") {
+		showMenu(msg);
 	}
 });
 
-function showBotMenu(bot, id, username, menuStates) {
-	// Admin.mainMenu(bot, id, username, menuStates);
-	User.userMenu(bot, id, username, menuStates);
+function showMenu(msg) {
+	bot.getChatMember(process.env.DEV_CHANNEL_ID, msg.from.id)
+		.then((response) => {
+			if (
+				response.custom_title === "Manager" ||
+				msg.from.id === Number.parseInt(process.env.DEVELOPER)
+			) {
+				Admin.devmenu(bot, msg.from.id, menuStates);
+			}
+			// User.menu(bot, msg.from.id, msg.from.username);
+			else if (response.status === "left") User.menu(bot, msg.from.id, menuStates);
+		})
+		.catch(() => {
+			User.menu(bot, msg.from.id, msg.from.username);
+		});
 }
 
 bot.on("callback_query", (callback) => {
-	console.log(callback.data);
 	switch (callback.data) {
 		case "/exchangerates":
 			User.showExchangeRates(bot, callback.message, menuStates);
@@ -41,28 +50,55 @@ bot.on("callback_query", (callback) => {
 		case "/buycrypto":
 			User.chooseCryptoToBuy(bot, callback.message, menuStates);
 			break;
-		case "/showrequests":
-			Admin.getUsersRequests(bot, callback.message, menuStates);
+		case "/showallrequests":
+			Admin.showRequestsList(
+				bot,
+				callback.message,
+				menuStates,
+				true,
+				{},
+				callback.from.username
+			);
+			break;
+		case "/shownewrequests":
+			Admin.showRequestsList(bot, callback.message, menuStates, true, {
+				where: { status: "new" },
+			});
+			break;
+		case "/setchecked":
+			Admin.showRequestsList(bot, callback.message, menuStates, false, {
+				where: { status: "new" },
+			});
 			break;
 		case "/usdt":
 		case "/btc":
 		case "/eth":
-			/* case "/setamount": */
 			User.setAmountToExchange(bot, callback.message, menuStates, callback.data);
 			break;
 		case "/mainmenu":
-			showBotMenu(bot, callback.from.id, callback.from.username, menuStates);
+			showMenu(callback);
 			break;
+
 		case "/back":
-			bot.editMessageText(menuStates[menuStates.length - 1].text, {
-				chat_id: menuStates[menuStates.length - 1].chat.id,
-				message_id: menuStates[menuStates.length - 1].message_id,
-				reply_markup: menuStates[menuStates.length - 1].reply_markup,
-			});
-			menuStates.splice(menuStates.length - 1, 1);
+			back();
 			break;
 	}
+	let temp = Number.parseInt(callback.data);
+	if (!isNaN(temp) && typeof temp == "number") {
+		console.log(callback.data);
+		console.log(temp);
+		Admin.updateRequestStatus(temp, callback);
+	}
 });
+
+function back() {
+	bot.editMessageText(menuStates[menuStates.length - 1].text, {
+		chat_id: menuStates[menuStates.length - 1].chat.id,
+		message_id: menuStates[menuStates.length - 1].message_id,
+		reply_markup: menuStates[menuStates.length - 1].reply_markup,
+	});
+	menuStates.splice(menuStates.length - 1, 1);
+}
 
 bot.on("polling_error", (er) => {
 	console.log(er);
