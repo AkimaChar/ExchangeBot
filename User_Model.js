@@ -30,7 +30,7 @@ User.init(
 			allowNull: null,
 		},
 		amount: {
-			type: DataTypes.DOUBLE,
+			type: DataTypes.FLOAT,
 			allowNull: null,
 		},
 		status: {
@@ -41,6 +41,10 @@ User.init(
 			type: DataTypes.STRING,
 			allowNull: true,
 		},
+		date: {
+			type: DataTypes.STRING,
+			allowNull: false,
+		},
 	},
 	{
 		sequelize, // Экземпляр подключения (обязательно)
@@ -48,7 +52,7 @@ User.init(
 		timestamps: false,
 	}
 );
-// sequelize.sync({ force: true });
-// await User.sync({ alter: true });
+
+// await User.sync({ force: true });
 
 export default User;

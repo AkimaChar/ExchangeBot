@@ -1,6 +1,6 @@
 import UserModel from "./User_Model.js";
 
-export function menu(bot, userID, menuStates) {
+export async function menu(bot, userID, menuStates) {
 	bot.sendMessage(userID, "Бот активен! Добро пожаловать", {
 		reply_markup: {
 			inline_keyboard: [
@@ -29,21 +29,16 @@ export function menu(bot, userID, menuStates) {
 	});
 }
 
-async function getRequestsList(needOpenDialog, options, manager) {
+async function getRequestsList(needOpenDialog, options) {
 	let keyboard = [];
 	Object.values(await UserModel.findAll(options)).map((el) => {
 		let button = [
 			{
-				text: `
-				 ${el.username} ${el.type} ${el.amount != 0 ? el.amount : ""} ${
+				text: `${el.date} ${el.username} ${el.type} ${el.amount != 0 ? el.amount : ""} ${
 					el.currency != "null" ? el.currency : ""
-				} (${el.manager != null ? el.manager + " " : ""}${el.status})
-			`,
+				} (${el.manager != null ? el.manager + " " : ""}${el.status})`,
 				callback_data: el.manager == null ? `${el.id}` : "/",
-				url:
-					needOpenDialog === true
-						? `https://t.me/${el.username}`
-						: "",
+				url: needOpenDialog === true ? `https://t.me/${el.username}` : "",
 			},
 		];
 		keyboard.push(button);
@@ -53,7 +48,7 @@ async function getRequestsList(needOpenDialog, options, manager) {
 }
 
 //* ВЫВОД СПИСКА ЗАКАЗОВ *//
-const AllUser = await UserModel.findAll({ raw: true });
+// const AllUser = await UserModel.findAll({ raw: true });
 
 export async function showRequestsList(
 	bot,
@@ -97,53 +92,4 @@ export async function updateRequestStatus(id, msg) {
 			},
 		}
 	);
-}
-
-export function devmenu(bot, userID, menuStates) {
-	bot.sendMessage(userID, "Бот активен! Добро пожаловать", {
-		reply_markup: {
-			inline_keyboard: [
-				[
-					{
-						text: "Показать новые заявки",
-						callback_data: "/shownewrequests",
-					},
-				],
-				[
-					{
-						text: "Погказать все заявки",
-						callback_data: "/showallrequests",
-					},
-				],
-				[
-					{
-						text: "Отметить закрытые заявки",
-						callback_data: "/setchecked",
-					},
-				],
-				[
-					{
-						text: "Курсы обмена",
-						callback_data: "/showrequests",
-					},
-					{
-						text: "Заказать обмен",
-						callback_data: "/orderexchange",
-					},
-				],
-				[
-					{
-						text: "Отзывы",
-						url: "vk.com/nikchm",
-					},
-					{
-						text: "Получить консультацию",
-						callback_data: "/requestconsult",
-					},
-				],
-			],
-		},
-	}).then((mainMenuMessage) => {
-		menuStates = [mainMenuMessage];
-	});
 }

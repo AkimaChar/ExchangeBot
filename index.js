@@ -9,6 +9,7 @@ dotenv.config();
 const token = process.env.DEV_BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 const menuStates = [];
+let msgID;
 
 bot.onText(/\/start/, (msg, match) => {
 	if (msg.chat.id > 0 && msg.text === "/start") {
@@ -23,7 +24,9 @@ function showMenu(msg) {
 				response.custom_title === "Manager" ||
 				msg.from.id === Number.parseInt(process.env.DEVELOPER)
 			) {
-				Admin.devmenu(bot, msg.from.id, menuStates);
+				User.menu(bot, msg.from.id, msg.from.username);
+				Admin.menu(bot, msg.from.id, menuStates, msgID);
+				msgID = ++msg.message_id;
 			}
 			// User.menu(bot, msg.from.id, msg.from.username);
 			else if (response.status === "left") User.menu(bot, msg.from.id, menuStates);
@@ -63,11 +66,13 @@ bot.on("callback_query", (callback) => {
 		case "/shownewrequests":
 			Admin.showRequestsList(bot, callback.message, menuStates, true, {
 				where: { status: "new" },
+				raw: true,
 			});
 			break;
 		case "/setchecked":
 			Admin.showRequestsList(bot, callback.message, menuStates, false, {
 				where: { status: "new" },
+				raw: true,
 			});
 			break;
 		case "/usdt":

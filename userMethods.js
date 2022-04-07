@@ -1,6 +1,5 @@
 import axios from "axios";
 import UserModel from "./User_Model.js";
-
 export function menu(bot, userid, username) {
 	bot.sendMessage(userid, "Меню клиента, выберите действие", {
 		reply_markup: {
@@ -27,17 +26,29 @@ export function menu(bot, userid, username) {
 				],
 			],
 		},
+	}).then((response) => {
+		let unix_timestamp = response.date;
+		let date = new Date(unix_timestamp * 1000);
+		const hours = date.getHours();
+		// Minutes part from the timestamp
+		const minutes = "0" + date.getMinutes();
+		// Seconds part from the timestamp
+		const seconds = "0" + date.getSeconds();
+
+		// Will display time in 10:30:23 format
+		UserOrder.date = hours + ":" + minutes.substr(-2) + ":" + seconds.substr(-2);
 	});
 	UserOrder.username = username;
 }
 
-const UserOrder = {
+export const UserOrder = {
 	username: 0,
 	type: 0,
 	currency: 0,
 	amount: 0,
 	status: 0,
 	manager: 0,
+	date: 0,
 };
 
 export function setAmountToExchange(bot, prev_msg, menuStates, data) {
@@ -151,6 +162,7 @@ export function chooseCryptoToSell(bot, prev_msg, menuStates) {
 		},
 	});
 }
+
 export async function sendConsultRequest(bot, prev_msg, menuStates) {
 	const newUser = await UserModel.create({
 		username: UserOrder.username,
@@ -158,8 +170,16 @@ export async function sendConsultRequest(bot, prev_msg, menuStates) {
 		currency: UserOrder.currency ? UserOrder.currency : "null",
 		amount: UserOrder.amount ? UserOrder.amount : 0,
 		status: "new",
-	}).then(() => {
-		sendNotification(bot);
+		date: UserOrder.date,
+	});
+
+	bot.getChatAdministrators(process.env.DEV_CHANNEL_ID).then((response) => {
+		response.forEach((element) => {
+			bot.sendMessage(
+				element.user.id,
+				`Новая заявка от ${UserOrder.username}, проверьте соотвествующий раздел!`
+			);
+		});
 	});
 
 	// console.log(await UserModel.findAll({ raw: true }));
@@ -179,31 +199,6 @@ export async function sendConsultRequest(bot, prev_msg, menuStates) {
 			],
 		},
 	});
-}
-
-export async function sendNotification(bot) {
-	const rqcount = Object.values(await UserModel.findAll({ where: { status: "new" } }));
-	bot.getChatAdministrators(process.env.DEV_CHANNEL_ID).then((el) => {
-		if (el.custom_title === "Manager") bot.sendMessage(el.id, "Новая заявка на консультацию!");
-		bot.sendMessage(
-			process.env.DEVELOPER,
-			rqcount.length !== 0
-				? `${rqcount.length} необработанных заявок на консультацию`
-				: "Новых заявок нет!"
-		).then((response) => {
-			updateNotification(bot, response);
-		});
-	});
-}
-
-export async function updateNotification(bot, notification) {
-	setInterval(async () => {
-		const rqcount = Object.values(await UserModel.findAll({ where: { status: "new" } }));
-		bot.editMessageText(`${rqcount.length} необработанных заявок на консультацию`, {
-			chat_id: notification.chat.id,
-			message_id: notification.message_id,
-		}).catch((e) => {});
-	}, 1000);
 }
 
 export function orderExchange(bot, prev_msg, menuStates) {
