@@ -11,29 +11,26 @@ const bot = new TelegramBot(token, { polling: true });
 const menuStates = [];
 let msgID;
 
-bot.onText(/\/start/, (msg, match) => {
+bot.on("message", (msg) => {
 	if (msg.chat.id > 0 && msg.text === "/start") {
 		showMenu(msg);
+	}
+	if (msg.chat.id > 0 && msg.text === "/dev") {
+		Admin.menu(bot, msg.from.id, menuStates, msgID);
+	}
+	if (msg.chat.id > 0 && msg.text === "/client") {
+		bot.getChatMember(process.env.DEV_CHANNEL_ID, msg.from.id).then((response) => {
+			if (response.status === "creator") User.menu(bot, msg.from.id, msg.from.username);
+		});
 	}
 });
 
 function showMenu(msg) {
-	bot.getChatMember(process.env.DEV_CHANNEL_ID, msg.from.id)
-		.then((response) => {
-			if (
-				response.custom_title === "Manager" ||
-				msg.from.id === Number.parseInt(process.env.DEVELOPER)
-			) {
-				User.menu(bot, msg.from.id, msg.from.username);
-				Admin.menu(bot, msg.from.id, menuStates, msgID);
-				msgID = ++msg.message_id;
-			}
-			// User.menu(bot, msg.from.id, msg.from.username);
-			else if (response.status === "left") User.menu(bot, msg.from.id, menuStates);
-		})
-		.catch(() => {
-			User.menu(bot, msg.from.id, msg.from.username);
-		});
+	bot.getChatMember(process.env.DEV_CHANNEL_ID, msg.from.id).then((response) => {
+		if (response.status === "left") User.menu(bot, msg.from.id, msg.from.username);
+		else if (response.status === "Manager" || response.status === "creator")
+			Admin.menu(bot, msg.from.id, msg.from.username);
+	});
 }
 
 bot.on("callback_query", (callback) => {

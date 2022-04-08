@@ -1,5 +1,7 @@
 import axios from "axios";
+import User from "./User_Model.js";
 import UserModel from "./User_Model.js";
+
 export function menu(bot, userid, username) {
 	bot.sendMessage(userid, "Меню клиента, выберите действие", {
 		reply_markup: {
@@ -7,7 +9,7 @@ export function menu(bot, userid, username) {
 				[
 					{
 						text: "Курсы обмена",
-						callback_data: "/showrequests",
+						callback_data: "/exchangerates",
 					},
 					{
 						text: "Заказать обмен",
@@ -34,7 +36,6 @@ export function menu(bot, userid, username) {
 		const minutes = "0" + date.getMinutes();
 		// Seconds part from the timestamp
 		const seconds = "0" + date.getSeconds();
-
 		// Will display time in 10:30:23 format
 		UserOrder.date = hours + ":" + minutes.substr(-2) + ":" + seconds.substr(-2);
 	});
@@ -50,52 +51,6 @@ export const UserOrder = {
 	manager: 0,
 	date: 0,
 };
-
-export function setAmountToExchange(bot, prev_msg, menuStates, data) {
-	const regexp = /(\d+\.\d+)|(\d+)/g;
-	menuStates.push(prev_msg);
-	bot.editMessageText("Укажите количество, которое хотите обменять, например, 100", {
-		chat_id: prev_msg.chat.id,
-		message_id: prev_msg.message_id,
-		reply_markup: {
-			inline_keyboard: [
-				[
-					{
-						text: "Назад",
-						callback_data: "/back",
-					},
-				],
-			],
-		},
-	});
-
-	bot.onText(regexp, (msg, match) => {
-		UserOrder.amount = parseInt(match);
-		//TODO: Add calculating exchange rate
-		bot.editMessageText("Вы заплатите ", {
-			chat_id: menuStates[menuStates.length - 1].chat.id,
-			message_id: menuStates[menuStates.length - 1].message_id,
-			reply_markup: {
-				inline_keyboard: [
-					[
-						{
-							text: "Оставить заявку",
-							callback_data: "/requestconsult",
-						},
-					],
-					[
-						{
-							text: "Назад",
-							callback_data: "/back",
-						},
-					],
-				],
-			},
-		});
-		bot.removeTextListener(regexp);
-	});
-	UserOrder.currency = data.slice(1);
-}
 
 export function chooseCryptoToBuy(bot, prev_msg, menuStates) {
 	menuStates.push(prev_msg);
@@ -175,10 +130,13 @@ export async function sendConsultRequest(bot, prev_msg, menuStates) {
 
 	bot.getChatAdministrators(process.env.DEV_CHANNEL_ID).then((response) => {
 		response.forEach((element) => {
-			bot.sendMessage(
-				element.user.id,
-				`Новая заявка от ${UserOrder.username}, проверьте соотвествующий раздел!`
-			);
+			console.log(element);
+			if (!element.user.is_bot) {
+				bot.sendMessage(
+					element.user.id,
+					`Новая заявка от ${UserOrder.username}, проверьте соотвествующий раздел!`
+				);
+			}
 		});
 	});
 
@@ -199,6 +157,239 @@ export async function sendConsultRequest(bot, prev_msg, menuStates) {
 			],
 		},
 	});
+}
+
+export async function setAmountToExchange(bot, prev_msg, menuStates, data) {
+	const regexp = /(\d+[.,]\d+)|(\d+)/g;
+	menuStates.push(prev_msg);
+	bot.editMessageText("Укажите количество, которое хотите обменять, например, 100", {
+		chat_id: prev_msg.chat.id,
+		message_id: prev_msg.message_id,
+		reply_markup: {
+			inline_keyboard: [
+				[
+					{
+						text: "Назад",
+						callback_data: "/back",
+					},
+				],
+			],
+		},
+	});
+	UserOrder.currency = data.slice(1);
+
+	bot.onText(regexp, (msg, match) => {
+		UserOrder.amount = parseFloat(match[0].replace(/,/g, "."));
+		//TODO: Add calculating exchange rate
+		(async () => {
+			bot.editMessageText(
+				await calculateValueToPay(UserOrder.type, UserOrder.currency, UserOrder.amount),
+				{
+					chat_id: menuStates[menuStates.length - 1].chat.id,
+					message_id: menuStates[menuStates.length - 1].message_id,
+					reply_markup: {
+						inline_keyboard: [
+							[
+								{
+									text: "Отправить",
+									callback_data: "/requestconsult",
+								},
+							],
+							[
+								{
+									text: "Назад",
+									callback_data: "/back",
+								},
+							],
+						],
+					},
+				}
+			);
+		})();
+		bot.removeTextListener(regexp);
+	});
+}
+async function calculateValueToPay(type, currency, volume) {
+	let valueRUB = 0;
+	let valueUSD = 0;
+	let temp = 0;
+	console.log(type);
+	console.log(currency);
+	console.log(volume);
+	if (type === "покупка") {
+		switch (currency) {
+			case "btc":
+				try {
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}rub`)
+						.then((response) => {
+							Object.values(response.data.asks).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueRUB += parseFloat(el.price);
+								} else return true;
+							});
+						});
+					temp = 0;
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}usd`)
+						.then((response) => {
+							Object.values(response.data.asks).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueUSD += parseFloat(el.price);
+								} else return true;
+							});
+						});
+				} catch (error) {
+					console.log(error);
+				}
+				break;
+			case "eth":
+				try {
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}rub`)
+						.then((response) => {
+							Object.values(response.data.asks).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueRUB += parseFloat(el.price);
+								} else return true;
+							});
+						});
+					temp = 0;
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}usd`)
+						.then((response) => {
+							Object.values(response.data.asks).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueUSD += parseFloat(el.price);
+								} else return true;
+							});
+						});
+				} catch (error) {
+					console.log(error);
+				}
+				break;
+			case "usdt":
+				try {
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}rub`)
+						.then((response) => {
+							Object.values(response.data.asks).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueRUB += parseFloat(el.price);
+								} else return true;
+							});
+						});
+					temp = 0;
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}usd`)
+						.then((response) => {
+							Object.values(response.data.asks).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueUSD += parseFloat(el.price);
+								} else return true;
+							});
+						});
+				} catch (error) {
+					console.log(error);
+				}
+				break;
+		}
+	} else {
+		switch (currency) {
+			case "btc":
+				try {
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}rub`)
+						.then((response) => {
+							Object.values(response.data.bids).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueRUB += parseFloat(el.price);
+								} else return true;
+							});
+						});
+					temp = 0;
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}usd`)
+						.then((response) => {
+							Object.values(response.data.bids).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueUSD += parseFloat(el.price);
+								} else return true;
+							});
+						});
+				} catch (error) {
+					console.log(error);
+				}
+				break;
+			case "eth":
+				try {
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}rub`)
+						.then((response) => {
+							Object.values(response.data.bids).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueRUB += parseFloat(el.price);
+								} else return true;
+							});
+						});
+					temp = 0;
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}usd`)
+						.then((response) => {
+							Object.values(response.data.bids).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueUSD += parseFloat(el.price);
+								} else return true;
+							});
+						});
+				} catch (error) {
+					console.log(error);
+				}
+				break;
+			case "usdt":
+				try {
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}rub`)
+						.then((response) => {
+							Object.values(response.data.bids).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueRUB += parseFloat(el.price);
+								} else return true;
+							});
+						});
+					temp = 0;
+					await axios
+						.get(`https://garantex.io/api/v2/depth?market=${currency}usd`)
+						.then((response) => {
+							Object.values(response.data.bids).some((el) => {
+								if (temp <= volume) {
+									temp += parseFloat(el.volume);
+									valueUSD += parseFloat(el.price);
+								} else return true;
+							});
+						});
+				} catch (error) {
+					console.log(error);
+				}
+				break;
+		}
+	}
+	return `
+	Ваша заявка: ${type} ${volume} ${currency.toUpperCase()},
+	в RUB: ${valueRUB.toFixed(2)}
+	в USD: ${valueUSD.toFixed(2)}
+	`;
 }
 
 export function orderExchange(bot, prev_msg, menuStates) {
@@ -233,6 +424,7 @@ export function orderExchange(bot, prev_msg, menuStates) {
 
 export async function showExchangeRates(bot, prev_msg, menuStates) {
 	menuStates.push(prev_msg);
+	console.log("dawdad");
 	bot.editMessageText(await _Rate_Values(), {
 		chat_id: prev_msg.chat.id,
 		message_id: prev_msg.message_id,
@@ -257,49 +449,131 @@ export async function showExchangeRates(bot, prev_msg, menuStates) {
 }
 
 async function _Rate_Values() {
-	//! Problem with getting usdt/rub rate
-	//TODO: Add rounding to values
-	//TODO: Add new currencies to show
-	//TODO: Add update interval
 	let sellUSDt_USD = 0;
 	let buyUSDt_USD = 0;
 	let sellUSDt_RUB = 0;
 	let buyUSDt_RUB = 0;
+
+	let sellBTC_USD = 0;
+	let buyBTC_USD = 0;
+	let sellBTC_RUB = 0;
+	let buyBTC_RUB = 0;
+
+	let sellETH_USD = 0;
+	let buyETH_USD = 0;
+	let sellETH_RUB = 0;
+	let buyETH_RUB = 0;
+
+	const floatRound = 2;
+	const serviceFee = 1.027;
+
 	try {
-		await axios.get("https://garantex.io/api/v2/depth?market=usdtusd").then((response) => {
-			Object.values(response.data.asks).map((el, i) => {
-				if (i < 5) sellUSDt_USD += +el.price;
-			});
-			Object.values(response.data.bids).map((el, i) => {
-				if (i < 5) buyUSDt_USD += +el.price;
-			});
-			sellUSDt_USD = (
-				(sellUSDt_USD / 5 - (1.0 / (sellUSDt_USD / 5)) * serviceFee) *
-				1.02
-			).toFixed(floatRound);
-			buyUSDt_USD = (buyUSDt_USD / 5 - (1.0 / (buyUSDt_USD / 5)) * serviceFee).toFixed(
-				floatRound
-			);
-		});
+		//* USDt *//
 		await axios.get("https://garantex.io/api/v2/depth?market=usdtrub").then((response) => {
 			Object.values(response.data.asks).map((el, i) => {
-				if (i < 5) sellUSDt_RUB += +el.price;
+				if (i < 5) sellUSDt_RUB += parseFloat(el.price);
 			});
 			Object.values(response.data.bids).map((el, i) => {
-				if (i < 5) buyUSDt_RUB += +el.price;
+				if (i < 5) buyUSDt_RUB += parseFloat(el.price);
 			});
-			sellUSDt_RUB = (
-				(sellUSDt_RUB / 5 - (10 / (sellUSDt_RUB / 5)) * serviceFee) *
-				1.02
-			).toFixed(floatRound);
-			buyUSDt_RUB = (buyUSDt_RUB / 5 - (10 / (buyUSDt_RUB / 5)) * serviceFee).toFixed(
+			sellUSDt_RUB = ((sellUSDt_RUB / 5) * serviceFee).toFixed(floatRound);
+			buyUSDt_RUB = ((buyUSDt_RUB / 5) * serviceFee).toFixed(floatRound);
+		});
+		await axios.get("https://garantex.io/api/v2/depth?market=usdtusd").then((response) => {
+			Object.values(response.data.asks).map((el, i) => {
+				if (i < 5) sellUSDt_USD += parseFloat(el.price);
+			});
+			Object.values(response.data.bids).map((el, i) => {
+				if (i < 5) buyUSDt_USD += parseFloat(el.price);
+			});
+			sellUSDt_USD = ((sellUSDt_USD / 5) * serviceFee).toFixed(floatRound);
+			buyUSDt_USD = ((buyUSDt_USD / 5) * serviceFee).toFixed(floatRound);
+		});
+		//* /USDt *//
+
+		//* /BTC *//
+		await axios.get("https://garantex.io/api/v2/depth?market=btcrub").then((response) => {
+			Object.values(response.data.asks).map((el, i) => {
+				if (i < 5) sellBTC_RUB += parseFloat(el.price);
+			});
+			Object.values(response.data.bids).map((el, i) => {
+				if (i < 5) buyBTC_RUB += parseFloat(el.price);
+			});
+			sellBTC_RUB = (sellBTC_RUB / 5 - (1.0 / (sellBTC_RUB / 5)) * serviceFee).toFixed(
+				floatRound
+			);
+			buyBTC_RUB = (buyBTC_RUB / 5 - (1.0 / (buyBTC_RUB / 5)) * serviceFee).toFixed(
 				floatRound
 			);
 		});
+		await axios.get("https://garantex.io/api/v2/depth?market=btcusd").then((response) => {
+			Object.values(response.data.asks).map((el, i) => {
+				if (i < 5) sellBTC_USD += parseFloat(el.price);
+			});
+			Object.values(response.data.bids).map((el, i) => {
+				if (i < 5) buyBTC_USD += parseFloat(el.price);
+			});
+			sellBTC_USD = (sellBTC_USD / 5 - (1.0 / (sellBTC_USD / 5)) * serviceFee).toFixed(
+				floatRound
+			);
+			buyBTC_USD = (buyBTC_USD / 5 - (1.0 / (buyBTC_USD / 5)) * serviceFee).toFixed(
+				floatRound
+			);
+		});
+		//* /BTC *//
+
+		//* ETH *//
+		await axios.get("https://garantex.io/api/v2/depth?market=ethrub").then((response) => {
+			Object.values(response.data.asks).map((el, i) => {
+				if (i < 5) sellETH_RUB += parseFloat(el.price);
+			});
+			Object.values(response.data.bids).map((el, i) => {
+				if (i < 5) buyETH_RUB += parseFloat(el.price);
+			});
+			sellETH_RUB = (sellETH_RUB / 5 - (1.0 / (sellETH_RUB / 5)) * serviceFee).toFixed(
+				floatRound
+			);
+			buyETH_RUB = (buyETH_RUB / 5 - (1.0 / (buyETH_RUB / 5)) * serviceFee).toFixed(
+				floatRound
+			);
+		});
+		await axios.get("https://garantex.io/api/v2/depth?market=ethusd").then((response) => {
+			Object.values(response.data.asks).map((el, i) => {
+				if (i < 5) sellETH_USD += parseFloat(el.price);
+			});
+			Object.values(response.data.bids).map((el, i) => {
+				if (i < 5) buyETH_USD += parseFloat(el.price);
+			});
+			sellETH_USD = (sellETH_USD / 5 - (1.0 / (sellETH_USD / 5)) * serviceFee).toFixed(
+				floatRound
+			);
+			buyETH_USD = (buyETH_USD / 5 - (1.0 / (buyETH_USD / 5)) * serviceFee).toFixed(
+				floatRound
+			);
+		});
+		//* /ETH *//
 	} catch (err) {
 		console.log(err);
 	}
 	return `
-    Актуальный курс\n(обновляется каждые 30 секунд пока активно)\n\n<b><u>USDt/RUB</u></b>\n\nПокупка: <b>${buyUSDt_RUB}₽</b>\nПродажа: <b>${sellUSDt_RUB}₽</b>\n\n<b><u>USDt/USD</u></b>\n\nПокупка: <b>${buyUSDt_USD}$</b>\nПродажа: <b>${sellUSDt_USD}$</b>\n\n
+    Актуальный курс\n
+	<b><u>USDt/RUB</u></b>
+	Покупка: <b>${buyUSDt_RUB}₽</b>
+	Продажа: <b>${sellUSDt_RUB}₽</b>\n
+	<b><u>USDt/USD</u></b>
+	Покупка: <b>${buyUSDt_USD}$</b>
+	Продажа: <b>${sellUSDt_USD}$</b>\n
+	<b><u>BTC/RUB</u></b>
+	Покупка: <b>${buyBTC_RUB}₽</b>
+	Продажа: <b>${sellBTC_RUB}₽</b>\n
+	<b><u>BTC/USD</u></b>
+	Покупка: <b>${buyBTC_USD}$</b>
+	Продажа: <b>${sellBTC_USD}$</b>\n
+	<b><u>ETH/RUB</u></b>
+	Покупка: <b>${buyETH_RUB}₽</b>
+	Продажа: <b>${sellETH_RUB}₽</b>\n
+	<b><u>ETH/USD</u></b>
+	Покупка: <b>${buyETH_USD}$</b>
+	Продажа: <b>${sellETH_USD}$</b>\n
     `;
 }

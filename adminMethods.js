@@ -24,9 +24,7 @@ export async function menu(bot, userID, menuStates) {
 				],
 			],
 		},
-	}).then((mainMenuMessage) => {
-		menuStates = [mainMenuMessage];
-	});
+	})
 }
 
 async function getRequestsList(needOpenDialog, options) {

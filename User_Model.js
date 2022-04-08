@@ -1,6 +1,6 @@
 import { Sequelize, DataTypes, Model } from "sequelize";
 
-const sequelize = new Sequelize("usersdb", "postgres", "postgres", {
+const sequelize = new Sequelize("postgres", "postgres", "postgres", {
 	host: process.env.DB_HOST || "localhost",
 	port: "5432",
 	dialect: "postgres",
@@ -30,7 +30,7 @@ User.init(
 			allowNull: null,
 		},
 		amount: {
-			type: DataTypes.FLOAT,
+			type: DataTypes.REAL,
 			allowNull: null,
 		},
 		status: {
