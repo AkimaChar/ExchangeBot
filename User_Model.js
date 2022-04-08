@@ -41,6 +41,14 @@ User.init(
 			type: DataTypes.STRING,
 			allowNull: true,
 		},
+		priceRUB: {
+			type: DataTypes.REAL,
+			allowNull: false,
+		},
+		priceUSD: {
+			type: DataTypes.REAL,
+			allowNull: false,
+		},
 		date: {
 			type: DataTypes.STRING,
 			allowNull: false,

@@ -49,6 +49,8 @@ export const UserOrder = {
 	amount: 0,
 	status: 0,
 	manager: 0,
+	priceRUB: 0,
+	priceUSD: 0,
 	date: 0,
 };
 
@@ -125,6 +127,8 @@ export async function sendConsultRequest(bot, prev_msg, menuStates) {
 		currency: UserOrder.currency ? UserOrder.currency : "null",
 		amount: UserOrder.amount ? UserOrder.amount : 0,
 		status: "new",
+		priceRUB: UserOrder.priceRUB ? UserOrder.priceRUB : "null",
+		priceUSD: UserOrder.priceUSD ? UserOrder.priceRUB : "null",
 		date: UserOrder.date,
 	});
 
@@ -212,6 +216,7 @@ export async function setAmountToExchange(bot, prev_msg, menuStates, data) {
 async function calculateValueToPay(type, currency, volume) {
 	let valueRUB = 0;
 	let valueUSD = 0;
+	let iterator = 0;
 	let temp = 0;
 	console.log(type);
 	console.log(currency);
@@ -227,6 +232,7 @@ async function calculateValueToPay(type, currency, volume) {
 								if (temp <= volume) {
 									temp += parseFloat(el.volume);
 									valueRUB += parseFloat(el.price);
+									++iterator;
 								} else return true;
 							});
 						});
@@ -385,10 +391,14 @@ async function calculateValueToPay(type, currency, volume) {
 				break;
 		}
 	}
+	valueRUB = (parseFloat(valueRUB) + parseFloat(valueRUB * 0.027)).toFixed(4);
+	valueUSD = (parseFloat(valueUSD) + parseFloat(valueUSD * 0.027)).toFixed(4);
+	UserOrder.priceUSD = valueUSD * volume;
+	UserOrder.priceRUB = valueRUB * volume;
 	return `
 	Ваша заявка: ${type} ${volume} ${currency.toUpperCase()},
-	в RUB: ${valueRUB.toFixed(2)}
-	в USD: ${valueUSD.toFixed(2)}
+	в USD: ${UserOrder.priceUSD.toFixed(2)}
+	в RUB: ${UserOrder.priceRUB.toFixed(2)}
 	`;
 }
 
@@ -424,7 +434,6 @@ export function orderExchange(bot, prev_msg, menuStates) {
 
 export async function showExchangeRates(bot, prev_msg, menuStates) {
 	menuStates.push(prev_msg);
-	console.log("dawdad");
 	bot.editMessageText(await _Rate_Values(), {
 		chat_id: prev_msg.chat.id,
 		message_id: prev_msg.message_id,

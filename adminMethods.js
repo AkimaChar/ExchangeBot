@@ -24,7 +24,7 @@ export async function menu(bot, userID, menuStates) {
 				],
 			],
 		},
-	})
+	});
 }
 
 async function getRequestsList(needOpenDialog, options) {
@@ -34,7 +34,9 @@ async function getRequestsList(needOpenDialog, options) {
 			{
 				text: `${el.date} ${el.username} ${el.type} ${el.amount != 0 ? el.amount : ""} ${
 					el.currency != "null" ? el.currency : ""
-				} (${el.manager != null ? el.manager + " " : ""}${el.status})`,
+				}${el.priceUSD ? "USD:" + el.priceUSD : ""}${
+					el.priceRUB ? " RUB:" + el.priceRUB : ""
+				}(${el.status})`,
 				callback_data: el.manager == null ? `${el.id}` : "/",
 				url: needOpenDialog === true ? `https://t.me/${el.username}` : "",
 			},
