@@ -14,7 +14,7 @@ try {
 	console.log("Невозможно выполнить подключение к БД: ", e);
 }
 
-class User extends Model {}
+class User extends Model { }
 User.init(
 	{
 		username: {

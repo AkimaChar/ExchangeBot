@@ -166,7 +166,7 @@ export async function sendConsultRequest(bot, prev_msg, menuStates) {
 export async function setAmountToExchange(bot, prev_msg, menuStates, data) {
 	const regexp = /(\d+[.,]\d+)|(\d+)/g;
 	menuStates.push(prev_msg);
-	bot.editMessageText("Укажите количество, которое хотите обменять, например, 100", {
+	bot.editMessageText("Укажите количество, которое хотите обменять (например, '123', '123.123' или '123,123')", {
 		chat_id: prev_msg.chat.id,
 		message_id: prev_msg.message_id,
 		reply_markup: {
@@ -183,6 +183,7 @@ export async function setAmountToExchange(bot, prev_msg, menuStates, data) {
 	UserOrder.currency = data.slice(1);
 
 	bot.onText(regexp, (msg, match) => {
+		console.log(match)
 		UserOrder.amount = parseFloat(match[0].replace(/,/g, "."));
 		//TODO: Add calculating exchange rate
 		(async () => {
